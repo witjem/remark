@@ -1,0 +1,47 @@
+secret: 123456789
+url: http://demo.remark42.com
+
+port: 8080
+web_root: /srv/var/web
+image_proxy: true
+read_only_age: 90
+
+sites:
+  - remark
+
+storage:
+  type: bolt
+  bolt_path: ./var
+
+admin:
+  email: admin@remark42.com
+  ids:
+    - 123456
+    - 908900
+
+auth:
+  jwt_exp: 72h
+  providers:
+    - name: google
+      cid: 123456789
+      csec: zxcvbnmasdfgh
+
+limits:
+  max_body_size: 65000
+  socket_timeout: 5m
+  comment_size: 2000
+  edit_duration: 5m
+
+backup:
+  location: /srv/var/backup
+  max_files: 15
+  duration: 24h
+
+avater:
+  type: fs
+  fs_path: /srv/var/avatar
+
+cache:
+  items: 1000
+  value_max_size: 100000   
+  cache_size: 5000000
