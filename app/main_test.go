@@ -21,6 +21,8 @@ func TestApplication(t *testing.T) {
 	go app.Run(ctx)
 	time.Sleep(100 * time.Millisecond) // let server start
 
+	assert.Equal(t, 4, len(app.restSrv.Authenticator.Providers), "%+v", app.Auth.Providers)
+
 	// send ping
 	resp, err := http.Get("http://localhost:18080/api/v1/ping")
 	require.Nil(t, err)
@@ -127,16 +129,19 @@ auth:
   providers:
     - name: google
       cid: 123456789
-      csec: zxcvbnmasdfgh
+      csec: 09876543210987654321
     - name: github
       cid: 123456789
-      csec: zxcvbnmasdfgh
+      csec: 09876543210987654321
     - name: facebook
       cid: 123456789
-      csec: zxcvbnmasdfgh
+      csec: 09876543210987654321
     - name: yandex
       cid: 123456789
-      csec: zxcvbnmasdfgh
+      csec: 09876543210987654321
+    - name: unknown
+      cid: 123456789
+      csec: 09876543210987654321
 `
 	confFileName := "/tmp/remark42-test.yml"
 	os.Remove(confFileName)
