@@ -69,7 +69,8 @@ func NewLoadingCache(options ...Option) (LoadingCache, error) {
 		return nil, errors.Wrap(err, "failed to make cache")
 	}
 
-	log.Printf("[DEBUG] create lru cache, maxKeys=%d, maxValueSize=%d", res.maxKeys, res.maxValueSize)
+	log.Printf("[DEBUG] create lru cache, maxKeys=%d, maxValueSize=%d, cacheSize=%d",
+		res.maxKeys, res.maxValueSize, res.maxCacheSize)
 	return &res, nil
 }
 

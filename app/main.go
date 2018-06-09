@@ -15,61 +15,92 @@ import (
 	"github.com/coreos/bbolt"
 	"github.com/hashicorp/logutils"
 	"github.com/jessevdk/go-flags"
+	"github.com/jinzhu/configor"
 	"github.com/pkg/errors"
-	"github.com/umputun/remark/app/store/engine"
-	"github.com/umputun/remark/app/store/service"
 
 	"github.com/umputun/remark/app/migrator"
 	"github.com/umputun/remark/app/rest/api"
 	"github.com/umputun/remark/app/rest/auth"
 	"github.com/umputun/remark/app/rest/cache"
 	"github.com/umputun/remark/app/rest/proxy"
+	"github.com/umputun/remark/app/store/engine"
+	"github.com/umputun/remark/app/store/service"
 )
 
 // Opts with command line flags and env
 // nolint:maligned
 type Opts struct {
-	BoltPath   string   `long:"bolt" env:"BOLTDB_PATH" default:"./var" description:"parent dir for bolt files"`
-	Sites      []string `long:"site" env:"SITE" default:"remark" description:"site names" env-delim:","`
-	RemarkURL  string   `long:"url" env:"REMARK_URL" required:"true" description:"url to remark"`
-	Admins     []string `long:"admin" env:"ADMIN" description:"admin(s) names" env-delim:","`
-	AdminEmail string   `long:"admin-email" env:"ADMIN_EMAIL" default:"" description:"admin email"`
-	DevPasswd  string   `long:"dev-passwd" env:"DEV_PASSWD" default:"" description:"development mode password"`
-	Dbg        bool     `long:"dbg" env:"DEBUG" description:"debug mode"`
+	Config string `short:"f" long:"config" env:"CONFIG" default:"config.yml" description:"config file"`
+	Dbg    bool   `long:"dbg" env:"DEBUG" description:"debug mode"`
+}
 
-	BackupLocation string `long:"backup" env:"BACKUP_PATH" default:"./var/backup" description:"backups location"`
-	MaxBackupFiles int    `long:"max-back" env:"MAX_BACKUP_FILES" default:"10" description:"max backups to keep"`
-	AvatarStore    string `long:"avatars" env:"AVATAR_STORE" default:"./var/avatars" description:"avatars location"`
-	ImageProxy     bool   `long:"img-proxy" env:"IMG_PROXY" description:"enable image proxy"`
+// Config maps yaml/json/toml config
+type Config struct {
+	SecretKey string `yaml:"secret" env:"SECRET" required:"true"`
+	RemarkURL string `yaml:"url" env:"REMARK_URL" required:"true"`
 
-	MaxCommentSize int `long:"max-comment" env:"MAX_COMMENT_SIZE" default:"2048" description:"max comment size"`
-	MaxCachedItems int `long:"max-cache-items" env:"MAX_CACHE_ITEMS" default:"1000" description:"max cached items"`
-	MaxCachedValue int `long:"max-cache-value" env:"MAX_CACHE_VALUE" default:"65536" description:"max size of cached value"`
-	MaxCacheSize   int `long:"max-cache-size" env:"MAX_CACHE_SIZE" default:"50000000" description:"max size of total cache"`
+	Sites       []string `yaml:"sites"`
+	Port        int      `yaml:"port" default:"8080"`
+	WebRoot     string   `yaml:"web" default:"./web"`
+	ReadOnlyAge int      `yaml:"read_only_age" default:"0"`
+	ImageProxy  bool     `yaml:"image_proxy" default:"false"`
+	DevPasswd   string   `yaml:"dev_passwd" default:""`
 
-	SecretKey     string `long:"secret" env:"SECRET" required:"true" description:"secret key"`
-	LowScore      int    `long:"low-score" env:"LOW_SCORE" default:"-5" description:"low score threshold"`
-	CriticalScore int    `long:"critical-score" env:"CRITICAL_SCORE" default:"-10" description:"critical score threshold"`
-	ReadOnlyAge   int    `long:"read-age" env:"READONLY_AGE" default:"0" description:"read-only age of comments"`
+	Storage struct {
+		Type     string `yaml:"type" default:"bolt"`
+		BoltPath string `yaml:"bolt_path" default:"./var"`
+	} `yaml:"storage"`
 
-	GoogleCID    string `long:"google-cid" env:"REMARK_GOOGLE_CID" description:"Google OAuth client ID"`
-	GoogleCSEC   string `long:"google-csec" env:"REMARK_GOOGLE_CSEC" description:"Google OAuth client secret"`
-	GithubCID    string `long:"github-cid" env:"REMARK_GITHUB_CID" description:"Github OAuth client ID"`
-	GithubCSEC   string `long:"github-csec" env:"REMARK_GITHUB_CSEC" description:"Github OAuth client secret"`
-	FacebookCID  string `long:"facebook-cid" env:"REMARK_FACEBOOK_CID" description:"Facebook OAuth client ID"`
-	FacebookCSEC string `long:"facebook-csec" env:"REMARK_FACEBOOK_CSEC" description:"Facebook OAuth client secret"`
-	YandexCID    string `long:"yandex-cid" env:"REMARK_YANDEX_CID" description:"Yandex OAuth client ID"`
-	YandexCSEC   string `long:"yandex-csec" env:"REMARK_YANDEX_CSEC" description:"Yandex OAuth client secret"`
+	Admin struct {
+		Email string   `yaml:"email"`
+		IDs   []string `yaml:"ids"`
+	} `yaml:"admins"`
 
-	Port    int    `long:"port" env:"REMARK_PORT" default:"8080" description:"port"`
-	WebRoot string `long:"web-root" env:"REMARK_WEB_ROOT" default:"./web" description:"web root directory"`
+	Limits struct {
+		Body          int           `yaml:"body" default:"65536"`
+		SocketTimeout time.Duration `yaml:"socket" default:"30s"`
+		CommentSize   int           `yaml:"comment_size" default:"2048"`
+		EditDuration  time.Duration `yaml:"edit_duration" default:"5m"`
+	} `yaml:"limits"`
+
+	Backup struct {
+		Location string        `yaml:"backup" default:"./var/backup"`
+		MaxFiles int           `yaml:"max_files" default:"10"`
+		Duration time.Duration `yaml:"duration" default:"24h"`
+	} `yaml:"backup"`
+
+	Auth struct {
+		JwtExp    time.Duration `yaml:"jwt_exp" default:"168h"`
+		Providers []struct {
+			Name string `yaml:"name"`
+			CID  string `yaml:"cid"`
+			CSEC string `yaml:"csec"`
+		} `yaml:"providers" required:"true"`
+	}
+
+	Avatar struct {
+		Type   string `yaml:"type" default:"fs"`
+		FsPath string `yaml:"fs_path" default:"./var/avatars"`
+	} `yaml:"avatar"`
+
+	Cache struct {
+		Items int   `yaml:"items" default:"1000"`
+		Value int   `yaml:"value" default:"100000"`
+		Size  int64 `yaml:"size" default:"50000000"`
+	} `yaml:"cache"`
+
+	Scores struct {
+		Low      int `yaml:"low" default:"-10"`
+		Critical int `yaml:"critical" default:"-20"`
+	} `yaml:"scores"`
 }
 
 var revision = "unknown"
 
 // Application holds all active objects
 type Application struct {
-	Opts
+	Config
+	debug       bool
 	restSrv     *api.Rest
 	migratorSrv *api.Migrator
 	exporter    migrator.Exporter
@@ -77,7 +108,7 @@ type Application struct {
 }
 
 func main() {
-	fmt.Printf("remark %s\n", revision)
+	fmt.Printf("remark42 %s\n", revision)
 
 	var opts Opts
 	p := flags.NewParser(&opts, flags.Default)
@@ -85,6 +116,12 @@ func main() {
 		os.Exit(1)
 	}
 	log.Print("[INFO] started remark")
+
+	var conf Config
+	if e := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, opts.Config); e != nil {
+		log.Fatalf("failed to load %s, %s", opts.Config, e)
+	}
+	os.Setenv("SECRET", "removed")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { // catch signal and invoke graceful termination
@@ -95,50 +132,53 @@ func main() {
 		cancel()
 	}()
 
-	app, err := New(opts)
+	app, err := New(conf, opts.Dbg)
 	if err != nil {
 		log.Fatalf("[ERROR] failed to setup application, %+v", err)
 	}
-	err = app.Run(ctx)
-	log.Printf("[INFO] remark terminated %s", err)
+	app.Run(ctx)
+	log.Printf("[INFO] remark terminated")
 }
 
 // New prepares application and return it with all active parts
 // doesn't start anything
-func New(opts Opts) (*Application, error) {
-	setupLog(opts.Dbg)
+func New(conf Config, dbg bool) (*Application, error) {
+	setupLog(dbg)
 
-	if err := makeDirs(opts.BoltPath, opts.BackupLocation, opts.AvatarStore); err != nil {
+	if len(conf.Sites) == 0 {
+		conf.Sites = append(conf.Sites, "remark")
+	}
+	if err := makeDirs(conf.Storage.BoltPath, conf.Backup.Location, conf.Avatar.FsPath); err != nil {
 		return nil, err
 	}
 
-	if !strings.HasPrefix(opts.RemarkURL, "http://") && !strings.HasPrefix(opts.RemarkURL, "https://") {
-		return nil, errors.Errorf("invalid remark42 url %s", opts.RemarkURL)
+	if !strings.HasPrefix(conf.RemarkURL, "http://") && !strings.HasPrefix(conf.RemarkURL, "https://") {
+		return nil, errors.Errorf("invalid remark42 url %s", conf.RemarkURL)
 	}
 
-	boltStore, err := makeBoltStore(opts.Sites, opts.BoltPath)
+	boltStore, err := makeBoltStore(conf.Sites, conf.Storage.BoltPath)
 	if err != nil {
 		return nil, err
 	}
 	dataService := service.DataStore{
 		Interface:      boltStore,
 		EditDuration:   5 * time.Minute,
-		Secret:         opts.SecretKey,
-		MaxCommentSize: opts.MaxCommentSize,
+		Secret:         conf.SecretKey,
+		MaxCommentSize: conf.Limits.CommentSize,
 	}
 
-	loadingCache, err := cache.NewLoadingCache(cache.MaxValSize(opts.MaxCachedValue), cache.MaxKeys(opts.MaxCachedItems),
-		cache.PostFlushFn(postFlushFn(opts.Sites, opts.Port)))
+	loadingCache, err := cache.NewLoadingCache(cache.MaxValSize(conf.Cache.Value), cache.MaxKeys(conf.Cache.Items),
+		cache.MaxCacheSize(conf.Cache.Size), cache.PostFlushFn(postFlushFn(conf.Sites, conf.Port)))
 	if err != nil {
 		return nil, err
 	}
 
-	jwtService := auth.NewJWT(opts.SecretKey, strings.HasPrefix(opts.RemarkURL, "https://"), 7*24*time.Hour)
+	jwtService := auth.NewJWT(conf.SecretKey, strings.HasPrefix(conf.RemarkURL, "https://"), conf.Auth.JwtExp)
 
 	avatarProxy := &proxy.Avatar{
-		Store:     proxy.NewFSAvatarStore(opts.AvatarStore),
+		Store:     proxy.NewFSAvatarStore(conf.Avatar.FsPath),
 		RoutePath: "/api/v1/avatar",
-		RemarkURL: strings.TrimSuffix(opts.RemarkURL, "/"),
+		RemarkURL: strings.TrimSuffix(conf.RemarkURL, "/"),
 	}
 
 	exporter := &migrator.Remark{DataStore: &dataService}
@@ -149,42 +189,42 @@ func New(opts Opts) (*Application, error) {
 		NativeImporter: &migrator.Remark{DataStore: &dataService},
 		DisqusImporter: &migrator.Disqus{DataStore: &dataService},
 		NativeExported: &migrator.Remark{DataStore: &dataService},
-		SecretKey:      opts.SecretKey,
+		SecretKey:      conf.SecretKey,
 	}
 
 	srv := &api.Rest{
 		Version:     revision,
 		DataService: dataService,
 		Exporter:    exporter,
-		WebRoot:     opts.WebRoot,
-		RemarkURL:   opts.RemarkURL,
-		ImageProxy:  &proxy.Image{Enabled: opts.ImageProxy, RoutePath: "/api/v1/img", RemarkURL: opts.RemarkURL},
+		WebRoot:     conf.WebRoot,
+		RemarkURL:   conf.RemarkURL,
+		ImageProxy:  &proxy.Image{Enabled: conf.ImageProxy, RoutePath: "/api/v1/img", RemarkURL: conf.RemarkURL},
 		AvatarProxy: avatarProxy,
-		ReadOnlyAge: opts.ReadOnlyAge,
+		ReadOnlyAge: conf.ReadOnlyAge,
 		Authenticator: auth.Authenticator{
 			JWTService: jwtService,
-			Admins:     opts.Admins,
-			AdminEmail: opts.AdminEmail,
-			Providers:  makeAuthProviders(jwtService, avatarProxy, dataService, opts),
-			DevPasswd:  opts.DevPasswd,
+			Admins:     conf.Admin.IDs,
+			AdminEmail: conf.Admin.Email,
+			Providers:  makeAuthProviders(jwtService, avatarProxy, dataService, conf),
+			DevPasswd:  conf.DevPasswd,
 		},
 		Cache: loadingCache,
 	}
 
 	// no admin email, use admin@domain
 	if srv.Authenticator.AdminEmail == "" {
-		if u, err := url.Parse(opts.RemarkURL); err == nil {
+		if u, err := url.Parse(conf.RemarkURL); err == nil {
 			srv.Authenticator.AdminEmail = "admin@" + u.Host
 		}
 	}
 
-	srv.ScoreThresholds.Low, srv.ScoreThresholds.Critical = opts.LowScore, opts.CriticalScore
+	srv.ScoreThresholds.Low, srv.ScoreThresholds.Critical = conf.Scores.Low, conf.Scores.Critical
 	tch := make(chan struct{})
-	return &Application{restSrv: srv, migratorSrv: migr, exporter: exporter, Opts: opts, terminated: tch}, nil
+	return &Application{Config: conf, restSrv: srv, migratorSrv: migr, exporter: exporter, debug: dbg, terminated: tch}, nil
 }
 
 // Run all application objects
-func (a *Application) Run(ctx context.Context) error {
+func (a *Application) Run(ctx context.Context) {
 	if a.DevPasswd != "" {
 		log.Printf("[WARN] running in dev mode")
 	}
@@ -199,7 +239,6 @@ func (a *Application) Run(ctx context.Context) error {
 	go a.migratorSrv.Run(a.Port + 1)
 	a.restSrv.Run(a.Port)
 	close(a.terminated)
-	return nil
 }
 
 // Wait for application completion (termination)
@@ -212,10 +251,10 @@ func (a *Application) activateBackup(ctx context.Context) {
 	for _, siteID := range a.Sites {
 		backup := migrator.AutoBackup{
 			Exporter:       a.exporter,
-			BackupLocation: a.BackupLocation,
+			BackupLocation: a.Backup.Location,
 			SiteID:         siteID,
-			KeepMax:        a.MaxBackupFiles,
-			Duration:       24 * time.Hour,
+			KeepMax:        a.Backup.MaxFiles,
+			Duration:       a.Backup.Duration,
 		}
 		go backup.Do(ctx)
 	}
@@ -263,34 +302,38 @@ func makeDirs(dirs ...string) error {
 	return nil
 }
 
-func makeAuthProviders(jwtService *auth.JWT, avatarProxy *proxy.Avatar, ds service.DataStore, opts Opts) []auth.Provider {
+func makeAuthProviders(jwtService *auth.JWT, avatarProxy *proxy.Avatar, ds service.DataStore, conf Config) []auth.Provider {
 
 	makeParams := func(cid, secret string) auth.Params {
 		return auth.Params{
 			JwtService:   jwtService,
 			AvatarProxy:  avatarProxy,
-			RemarkURL:    opts.RemarkURL,
+			RemarkURL:    conf.RemarkURL,
 			Cid:          cid,
 			Csecret:      secret,
-			Admins:       opts.Admins,
-			SecretKey:    opts.SecretKey,
+			Admins:       conf.Admin.IDs,
+			SecretKey:    conf.SecretKey,
 			IsVerifiedFn: ds.IsVerifiedFn(),
 		}
 	}
 
 	providers := []auth.Provider{}
-	if opts.GoogleCID != "" && opts.GoogleCSEC != "" {
-		providers = append(providers, auth.NewGoogle(makeParams(opts.GoogleCID, opts.GoogleCSEC)))
+
+	for _, p := range conf.Auth.Providers {
+		switch strings.ToLower(p.Name) {
+		case "google":
+			providers = append(providers, auth.NewGoogle(makeParams(p.CID, p.CID)))
+		case "github":
+			providers = append(providers, auth.NewGithub(makeParams(p.CID, p.CID)))
+		case "facebook":
+			providers = append(providers, auth.NewFacebook(makeParams(p.CID, p.CID)))
+		case "yandex":
+			providers = append(providers, auth.NewYandex(makeParams(p.CID, p.CID)))
+		default:
+			log.Printf("[WARN] unrecognized auth provider %s", p.Name)
+		}
 	}
-	if opts.GithubCID != "" && opts.GithubCSEC != "" {
-		providers = append(providers, auth.NewGithub(makeParams(opts.GithubCID, opts.GithubCSEC)))
-	}
-	if opts.FacebookCID != "" && opts.FacebookCSEC != "" {
-		providers = append(providers, auth.NewFacebook(makeParams(opts.FacebookCID, opts.FacebookCSEC)))
-	}
-	if opts.YandexCID != "" && opts.YandexCSEC != "" {
-		providers = append(providers, auth.NewYandex(makeParams(opts.YandexCID, opts.YandexCSEC)))
-	}
+
 	if len(providers) == 0 {
 		log.Printf("[WARN] no auth providers defined")
 	}

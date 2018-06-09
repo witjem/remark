@@ -8,6 +8,12 @@
   version = "v0.18.0"
 
 [[projects]]
+  name = "github.com/BurntSushi/toml"
+  packages = ["."]
+  revision = "b26d9c308763d68093482582cea63d69be07a0f0"
+  version = "v0.3.0"
+
+[[projects]]
   name = "github.com/PuerkitoBio/goquery"
   packages = ["."]
   revision = "a86ea073017a6beddef78c8659e7224e8ca634b0"
@@ -122,6 +128,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/jinzhu/configor"
+  packages = ["."]
+  revision = "ec34f328956f53dfbd06e9f5306e37e6943443c3"
+
+[[projects]]
+  branch = "master"
   name = "github.com/microcosm-cc/bluemonday"
   packages = ["."]
   revision = "542fd4642604d0d0c26112396ce5b1a9d01eee0b"
@@ -220,9 +232,15 @@
   revision = "cadec560ec52d93835bf2f15bd794700d3a2473b"
   version = "v2.0.0"
 
+[[projects]]
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e849348430ea10a86642c328c52b516e237207389cf765ff1849c8bded391d4a"
+  inputs-digest = "21274534b290cc2576a9fc1c1e2ae4d4dc36ca2fc2f1638584f8bf386ad6fcbd"
   solver-name = "gps-cdcl"
   solver-version = 1

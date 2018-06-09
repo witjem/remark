@@ -1,0 +1,19 @@
+secret: 123456789
+url: http://demo.remark42.com
+
+sites:
+  - remark
+
+storage:
+  type: bolt
+  bolt_path: ./var
+
+auth:
+  providers:
+    - name: google
+      cid: 123456789
+      csec: zxcvbnmasdfgh
+
+limits:
+  body: 65000
+  socket: 5m

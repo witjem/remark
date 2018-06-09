@@ -27,7 +27,7 @@ type AutoBackup struct {
 func (ab AutoBackup) Do(ctx context.Context) {
 	log.Printf("[INFO] activate auto-backup for %s under %s, duration %s", ab.SiteID, ab.BackupLocation, ab.Duration)
 	tick := time.NewTicker(ab.Duration)
-	log.Printf("[DEBUG] first backup for %s at %s", ab.SiteID, time.Now().Add(ab.Duration))
+	log.Printf("[DEBUG] first backup for %s at %s", ab.SiteID, time.Now().Add(ab.Duration).Format(time.RFC3339))
 
 	for {
 		select {
@@ -37,7 +37,7 @@ func (ab AutoBackup) Do(ctx context.Context) {
 				continue
 			}
 			ab.removeOldBackupFiles()
-			log.Printf("[DEBUG] next backup for %s at %s", ab.SiteID, time.Now().Add(ab.Duration))
+			log.Printf("[DEBUG] next backup for %s at %s", ab.SiteID, time.Now().Add(ab.Duration).Format(time.RFC3339))
 		case <-ctx.Done():
 			log.Printf("[WARN] terminated autobackup for %s", ab.SiteID)
 			return

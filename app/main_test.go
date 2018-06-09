@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jinzhu/configor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestApplication(t *testing.T) {
 	app, ctx := prepApp(t, 18080, 500*time.Millisecond)
-	go func() { _ = app.Run(ctx) }()
+	go app.Run(ctx)
 	time.Sleep(100 * time.Millisecond) // let server start
 
 	// send ping
@@ -45,27 +44,28 @@ func TestApplication(t *testing.T) {
 }
 
 func TestApplicationFailed(t *testing.T) {
-	opts := Opts{}
-	p := flags.NewParser(&opts, flags.Default)
+	conf, location := prepConf(t)
+	defer os.Remove(location)
 
 	// RO bolt location
-	p.ParseArgs([]string{"--secret=123456", "--url=https://demo.remark42.com", "--bolt=/dev/null"})
-	_, err := New(opts)
+	conf.Storage.BoltPath = "/dev/null"
+	_, err := New(conf, true)
 	assert.EqualError(t, err, "can't initialize data store: failed to make boltdb for /dev/null/remark.db: "+
 		"open /dev/null/remark.db: not a directory")
 	t.Log(err)
 
 	// RO backup location
-	opts = Opts{}
-	p.ParseArgs([]string{"--secret=123456", "--url=https://demo.remark42.com", "--bolt=/tmp", "--backup=/dev/null/not-writable"})
-	_, err = New(opts)
+	conf.Storage.BoltPath = "/tmp"
+	conf.Backup.Location = "/dev/null/not-writable"
+	_, err = New(conf, true)
 	assert.EqualError(t, err, "can't check directory status for /dev/null/not-writable: stat /dev/null/not-writable: not a directory")
 	t.Log(err)
 
 	// invalid url
-	opts = Opts{}
-	p.ParseArgs([]string{"--secret=123456", "--url=demo.remark42.com", "--bolt=/tmp"})
-	_, err = New(opts)
+	conf.Storage.BoltPath = "/tmp"
+	conf.Backup.Location = "/tmp"
+	conf.RemarkURL = "demo.remark42.com"
+	_, err = New(conf, true)
 	assert.EqualError(t, err, "invalid remark42 url demo.remark42.com")
 	t.Log(err)
 }
@@ -79,8 +79,10 @@ func TestApplicationShutdown(t *testing.T) {
 }
 
 func TestApplicationMainSignal(t *testing.T) {
-	os.Args = []string{"test", "--secret=123456", "--bolt=/tmp/xyz", "--backup=/tmp", "--avatars=/tmp",
-		"--port=18100", "--url=https://demo.remark42.com"}
+	conf, location := prepConf(t)
+	defer os.Remove(location)
+	os.Remove(conf.Storage.BoltPath + "/remark.db")
+	os.Args = []string{"--dbg", "--config=" + location}
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
@@ -93,21 +95,14 @@ func TestApplicationMainSignal(t *testing.T) {
 
 func prepApp(t *testing.T, port int, duration time.Duration) (*Application, context.Context) {
 	// prepare options
-	opts := Opts{}
-	p := flags.NewParser(&opts, flags.Default)
-	p.ParseArgs([]string{"--secret=123456", "--dev-passwd=password", "--url=https://demo.remark42.com"})
-	opts.AvatarStore, opts.BackupLocation = "/tmp", "/tmp"
-	opts.BoltPath = fmt.Sprintf("/tmp/%d", port)
-	opts.GithubCSEC, opts.GithubCID = "csec", "cid"
-	opts.GoogleCSEC, opts.GoogleCID = "csec", "cid"
-	opts.FacebookCSEC, opts.FacebookCID = "csec", "cid"
-	opts.YandexCSEC, opts.YandexCID = "csec", "cid"
-	opts.Port = port
 
-	os.Remove(opts.BoltPath + "/remark.db")
+	conf, location := prepConf(t)
+	defer os.Remove(location)
+	os.Remove(conf.Storage.BoltPath + "/remark.db")
 
+	conf.Port = port
 	// create app
-	app, err := New(opts)
+	app, err := New(conf, true)
 	require.Nil(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -117,4 +112,28 @@ func prepApp(t *testing.T, port int, duration time.Duration) (*Application, cont
 		cancel()
 	}()
 	return app, ctx
+}
+
+func prepConf(t *testing.T) (conf Config, location string) {
+	// prepare options
+	configFile := `
+secret: 123456
+dev_passwd: password
+url: https://demo.remark42.com
+storage:
+  type: bolt
+  bolt_path: /tmp
+auth:
+  providers:
+    - name: google
+      cid: 123456789
+      csec: zxcvbnmasdfgh
+`
+	confFileName := "/tmp/remark42-test.yml"
+	ioutil.WriteFile(confFileName, []byte(configFile), 0600)
+
+	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, confFileName)
+	require.Nil(t, err)
+
+	return conf, confFileName
 }
