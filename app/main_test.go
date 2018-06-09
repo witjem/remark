@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(t *testing.T) {
+func TestMainApp(t *testing.T) {
 	os.Args = []string{"test", "--dbg", "--config=/tmp/remark42-test.yml"}
 
 	confFileName := "/tmp/remark42-test.yml"
@@ -35,4 +35,16 @@ auth:
   - name: google
     cid: 123456789
     csec: 09876543210987654321
+storage:
+  type: bolt
+  bolt:
+   location: /tmp/remark42-main.test
+backup:
+  type: local
+  local:
+   location: /tmp/remark42-main.test
+avatar:
+  type: fs
+  fs:
+   location: /tmp
 `

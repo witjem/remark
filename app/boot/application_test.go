@@ -52,22 +52,22 @@ func TestApplicationFailed(t *testing.T) {
 	defer os.Remove(location)
 
 	// RO bolt location
-	conf.Storage.BoltPath = "/dev/null"
+	conf.Storage.Bolt.Location = "/dev/null"
 	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "can't initialize data store: failed to make boltdb for /dev/null/remark.db: "+
 		"open /dev/null/remark.db: not a directory")
 	t.Log(err)
 
 	// RO backup location
-	conf.Storage.BoltPath = "/tmp"
-	conf.Backup.Location = "/dev/null/not-writable"
+	conf.Storage.Bolt.Location = "/tmp"
+	conf.Backup.Local.Location = "/dev/null/not-writable"
 	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "can't check directory status for /dev/null/not-writable: stat /dev/null/not-writable: not a directory")
 	t.Log(err)
 
 	// invalid url
-	conf.Storage.BoltPath = "/tmp"
-	conf.Backup.Location = "/tmp"
+	conf.Storage.Bolt.Location = "/tmp"
+	conf.Backup.Local.Location = "/tmp"
 	conf.RemarkURL = "demo.remark42.com"
 	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "invalid remark42 url demo.remark42.com")
@@ -90,7 +90,7 @@ func prepApp(t *testing.T, port int, duration time.Duration) (*Application, cont
 	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, location)
 	require.Nil(t, err)
 	defer os.Remove(location)
-	os.Remove(conf.Storage.BoltPath + "/remark.db")
+	os.Remove(conf.Storage.Bolt.Location + "/remark.db")
 
 	conf.Port = port
 	// create app

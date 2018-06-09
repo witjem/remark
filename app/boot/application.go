@@ -39,7 +39,7 @@ func NewApplication(conf *Config, revision string) (*Application, error) {
 	if len(conf.Sites) == 0 {
 		conf.Sites = append(conf.Sites, "remark")
 	}
-	if err := makeDirs(conf.Storage.BoltPath, conf.Backup.Location, conf.Avatar.FsPath); err != nil {
+	if err := makeDirs(conf.Storage.Bolt.Location, conf.Backup.Local.Location, conf.Avatar.FS.Location); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +47,7 @@ func NewApplication(conf *Config, revision string) (*Application, error) {
 		return nil, errors.Errorf("invalid remark42 url %s", conf.RemarkURL)
 	}
 
-	boltStore, err := makeBoltStore(conf.Sites, conf.Storage.BoltPath)
+	boltStore, err := makeStore(conf.Sites, conf.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func NewApplication(conf *Config, revision string) (*Application, error) {
 	jwtService := auth.NewJWT(conf.SecretKey, strings.HasPrefix(conf.RemarkURL, "https://"), conf.Auth.JwtExp)
 
 	avatarProxy := &proxy.Avatar{
-		Store:     proxy.NewFSAvatarStore(conf.Avatar.FsPath),
+		Store:     proxy.NewFSAvatarStore(conf.Avatar.FS.Location),
 		RoutePath: "/api/v1/avatar",
 		RemarkURL: strings.TrimSuffix(conf.RemarkURL, "/"),
 	}
@@ -142,7 +142,7 @@ func (a *Application) activateBackup(ctx context.Context) {
 	for _, siteID := range a.Sites {
 		backup := migrator.AutoBackup{
 			Exporter:       a.exporter,
-			BackupLocation: a.Backup.Location,
+			BackupLocation: a.Backup.Local.Location,
 			SiteID:         siteID,
 			KeepMax:        a.Backup.MaxFiles,
 			Duration:       a.Backup.Duration,
@@ -151,17 +151,21 @@ func (a *Application) activateBackup(ctx context.Context) {
 	}
 }
 
-// makeBoltStore creates store for all sites
-func makeBoltStore(siteNames []string, path string) (engine.Interface, error) {
-	sites := []engine.BoltSite{}
-	for _, site := range siteNames {
-		sites = append(sites, engine.BoltSite{SiteID: site, FileName: fmt.Sprintf("%s/%s.db", path, site)})
+// makeStore creates store for all sites
+func makeStore(siteNames []string, store Store) (engine.Interface, error) {
+	switch store.Type {
+	case "bolt":
+		sites := []engine.BoltSite{}
+		for _, site := range siteNames {
+			sites = append(sites, engine.BoltSite{SiteID: site, FileName: fmt.Sprintf("%s/%s.db", store.Bolt.Location, site)})
+		}
+		result, err := engine.NewBoltDB(bolt.Options{Timeout: 30 * time.Second}, sites...)
+		if err != nil {
+			return nil, errors.Wrap(err, "can't initialize data store")
+		}
+		return result, nil
 	}
-	result, err := engine.NewBoltDB(bolt.Options{Timeout: 30 * time.Second}, sites...)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't initialize data store")
-	}
-	return result, nil
+	return nil, errors.Errorf("unsupported store type %s", store.Type)
 }
 
 // mkdir -p for all dirs

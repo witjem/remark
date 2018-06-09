@@ -26,11 +26,17 @@ dev_passwd: password
 url: https://demo.remark42.com
 storage:
   type: bolt
-  bolt_path: /tmp
+  bolt:
+   location: /tmp
 backup:
-  location: /tmp
+  type: local
+  local:
+   location: /tmp
 avatar:
-  fs_path: /tmp
+  type: fs
+  fs:
+   location: /tmp
+
 auth:
   providers:
     - name: google
