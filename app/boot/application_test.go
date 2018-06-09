@@ -50,7 +50,7 @@ func TestApplicationFailed(t *testing.T) {
 
 	// RO bolt location
 	conf.Storage.BoltPath = "/dev/null"
-	_, err := NewApplication(conf, "", true)
+	_, err := NewApplication(conf, "")
 	assert.EqualError(t, err, "can't initialize data store: failed to make boltdb for /dev/null/remark.db: "+
 		"open /dev/null/remark.db: not a directory")
 	t.Log(err)
@@ -58,7 +58,7 @@ func TestApplicationFailed(t *testing.T) {
 	// RO backup location
 	conf.Storage.BoltPath = "/tmp"
 	conf.Backup.Location = "/dev/null/not-writable"
-	_, err = NewApplication(conf, "", true)
+	_, err = NewApplication(conf, "")
 	assert.EqualError(t, err, "can't check directory status for /dev/null/not-writable: stat /dev/null/not-writable: not a directory")
 	t.Log(err)
 
@@ -66,7 +66,7 @@ func TestApplicationFailed(t *testing.T) {
 	conf.Storage.BoltPath = "/tmp"
 	conf.Backup.Location = "/tmp"
 	conf.RemarkURL = "demo.remark42.com"
-	_, err = NewApplication(conf, "", true)
+	_, err = NewApplication(conf, "")
 	assert.EqualError(t, err, "invalid remark42 url demo.remark42.com")
 	t.Log(err)
 }
@@ -88,7 +88,7 @@ func prepApp(t *testing.T, port int, duration time.Duration) (*Application, cont
 
 	conf.Port = port
 	// create app
-	app, err := NewApplication(conf, "124", true)
+	app, err := NewApplication(conf, "124")
 	require.Nil(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

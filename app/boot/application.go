@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/coreos/bbolt"
-	"github.com/hashicorp/logutils"
 	"github.com/pkg/errors"
 
 	"github.com/umputun/remark/app/migrator"
@@ -35,8 +34,7 @@ type Application struct {
 
 // NewApplication prepares application and return it with all active parts
 // doesn't start anything
-func NewApplication(conf *Config, revision string, dbg bool) (*Application, error) {
-	setupLog(dbg)
+func NewApplication(conf *Config, revision string) (*Application, error) {
 
 	if len(conf.Sites) == 0 {
 		conf.Sites = append(conf.Sites, "remark")
@@ -113,7 +111,7 @@ func NewApplication(conf *Config, revision string, dbg bool) (*Application, erro
 
 	srv.ScoreThresholds.Low, srv.ScoreThresholds.Critical = conf.Scores.Low, conf.Scores.Critical
 	tch := make(chan struct{})
-	return &Application{Config: conf, restSrv: srv, migratorSrv: migr, exporter: exporter, debug: dbg, terminated: tch}, nil
+	return &Application{Config: conf, restSrv: srv, migratorSrv: migr, exporter: exporter, terminated: tch}, nil
 }
 
 // Run all application objects
@@ -256,20 +254,4 @@ func postFlushFn(sites []string, port int) func() {
 			}
 		}
 	}
-}
-
-func setupLog(dbg bool) {
-	filter := &logutils.LevelFilter{
-		Levels:   []logutils.LogLevel{"DEBUG", "INFO", "WARN", "ERROR"},
-		MinLevel: logutils.LogLevel("INFO"),
-		Writer:   os.Stdout,
-	}
-
-	log.SetFlags(log.Ldate | log.Ltime)
-
-	if dbg {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-		filter.MinLevel = logutils.LogLevel("DEBUG")
-	}
-	log.SetOutput(filter)
 }
