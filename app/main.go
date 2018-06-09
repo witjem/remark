@@ -121,7 +121,9 @@ func main() {
 	if e := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, opts.Config); e != nil {
 		log.Fatalf("failed to load %s, %s", opts.Config, e)
 	}
-	os.Setenv("SECRET", "removed")
+	if err := os.Setenv("SECRET", "removed"); err != nil {
+		log.Printf("[WARN] can't clear SECRET env, %s", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { // catch signal and invoke graceful termination
