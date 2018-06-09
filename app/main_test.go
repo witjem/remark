@@ -44,7 +44,7 @@ func TestApplication(t *testing.T) {
 }
 
 func TestApplicationFailed(t *testing.T) {
-	conf, location := prepConf(t)
+	conf, location := prepConf(t, true)
 	defer os.Remove(location)
 
 	// RO bolt location
@@ -79,7 +79,7 @@ func TestApplicationShutdown(t *testing.T) {
 }
 
 func TestApplicationMainSignal(t *testing.T) {
-	conf, location := prepConf(t)
+	conf, location := prepConf(t, true)
 	defer os.Remove(location)
 	os.Remove(conf.Storage.BoltPath + "/remark.db")
 	os.Args = []string{"--dbg", "--config=" + location}
@@ -92,11 +92,14 @@ func TestApplicationMainSignal(t *testing.T) {
 	main()
 	assert.True(t, time.Since(st).Seconds() < 1, "should take about 500msec")
 }
+func TestApplicationBadConfig(t *testing.T) {
+	prepConf(t, false)
+}
 
 func prepApp(t *testing.T, port int, duration time.Duration) (*Application, context.Context) {
 	// prepare options
 
-	conf, location := prepConf(t)
+	conf, location := prepConf(t, true)
 	defer os.Remove(location)
 	os.Remove(conf.Storage.BoltPath + "/remark.db")
 
@@ -114,7 +117,7 @@ func prepApp(t *testing.T, port int, duration time.Duration) (*Application, cont
 	return app, ctx
 }
 
-func prepConf(t *testing.T) (conf Config, location string) {
+func prepConf(t *testing.T, good bool) (conf Config, location string) {
 	// prepare options
 	configFile := `
 secret: 123456
@@ -129,11 +132,18 @@ auth:
       cid: 123456789
       csec: zxcvbnmasdfgh
 `
+	if !good {
+		configFile = strings.Replace(configFile, "secret: 123456", "", -1)
+	}
 	confFileName := "/tmp/remark42-test.yml"
 	ioutil.WriteFile(confFileName, []byte(configFile), 0600)
 
 	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, confFileName)
-	require.Nil(t, err)
+	if good {
+		require.Nil(t, err)
+	} else {
+		require.NotNil(t, err)
+	}
 
 	return conf, confFileName
 }
