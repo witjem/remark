@@ -45,12 +45,15 @@ func TestApplication(t *testing.T) {
 }
 
 func TestApplicationFailed(t *testing.T) {
-	conf, location := prepConf(t)
+	location := prepConf(t)
+	var conf Config
+	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, location)
+	require.Nil(t, err)
 	defer os.Remove(location)
 
 	// RO bolt location
 	conf.Storage.BoltPath = "/dev/null"
-	_, err := NewApplication(conf, "")
+	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "can't initialize data store: failed to make boltdb for /dev/null/remark.db: "+
 		"open /dev/null/remark.db: not a directory")
 	t.Log(err)
@@ -58,7 +61,7 @@ func TestApplicationFailed(t *testing.T) {
 	// RO backup location
 	conf.Storage.BoltPath = "/tmp"
 	conf.Backup.Location = "/dev/null/not-writable"
-	_, err = NewApplication(conf, "")
+	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "can't check directory status for /dev/null/not-writable: stat /dev/null/not-writable: not a directory")
 	t.Log(err)
 
@@ -66,7 +69,7 @@ func TestApplicationFailed(t *testing.T) {
 	conf.Storage.BoltPath = "/tmp"
 	conf.Backup.Location = "/tmp"
 	conf.RemarkURL = "demo.remark42.com"
-	_, err = NewApplication(conf, "")
+	_, err = NewApplication(&conf, "")
 	assert.EqualError(t, err, "invalid remark42 url demo.remark42.com")
 	t.Log(err)
 }
@@ -82,13 +85,16 @@ func TestApplicationShutdown(t *testing.T) {
 func prepApp(t *testing.T, port int, duration time.Duration) (*Application, context.Context) {
 	// prepare options
 
-	conf, location := prepConf(t)
+	location := prepConf(t)
+	var conf Config
+	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, location)
+	require.Nil(t, err)
 	defer os.Remove(location)
 	os.Remove(conf.Storage.BoltPath + "/remark.db")
 
 	conf.Port = port
 	// create app
-	app, err := NewApplication(conf, "124")
+	app, err := NewApplication(&conf, "124")
 	require.Nil(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -98,44 +104,4 @@ func prepApp(t *testing.T, port int, duration time.Duration) (*Application, cont
 		cancel()
 	}()
 	return app, ctx
-}
-
-func prepConf(t *testing.T) (*Config, string) {
-	// prepare options
-	configFile := `
-secret: 123456
-dev_passwd: password
-url: https://demo.remark42.com
-storage:
-  type: bolt
-  bolt_path: /tmp
-backup:
-  location: /tmp
-avatar:
-  fs_path: /tmp
-auth:
-  providers:
-    - name: google
-      cid: 123456789
-      csec: 09876543210987654321
-    - name: github
-      cid: 123456789
-      csec: 09876543210987654321
-    - name: facebook
-      cid: 123456789
-      csec: 09876543210987654321
-    - name: yandex
-      cid: 123456789
-      csec: 09876543210987654321
-    - name: unknown
-      cid: 123456789
-      csec: 09876543210987654321
-`
-	confFileName := "/tmp/remark42-test.yml"
-	os.Remove(confFileName)
-	ioutil.WriteFile(confFileName, []byte(configFile), 0600)
-	var conf Config
-	err := configor.New(&configor.Config{Debug: false, ErrorOnUnmatchedKeys: true}).Load(&conf, confFileName)
-	require.Nil(t, err)
-	return &conf, confFileName
 }
