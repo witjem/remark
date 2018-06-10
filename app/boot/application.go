@@ -85,7 +85,7 @@ func NewApplication(conf *Config, revision string) (*Application, error) {
 
 	srv := &api.Rest{
 		Version:     revision,
-		DataService: dataService,
+		DataService: &dataService,
 		Exporter:    exporter,
 		WebRoot:     conf.WebRoot,
 		RemarkURL:   conf.RemarkURL,
@@ -155,6 +155,9 @@ func (a *Application) activateBackup(ctx context.Context) {
 func makeStore(siteNames []string, store Store) (engine.Interface, error) {
 	switch store.Type {
 	case "bolt":
+		if err := makeDirs(store.Bolt.Location); err != nil {
+			return nil, err
+		}
 		sites := []engine.BoltSite{}
 		for _, site := range siteNames {
 			sites = append(sites, engine.BoltSite{SiteID: site, FileName: fmt.Sprintf("%s/%s.db", store.Bolt.Location, site)})
@@ -165,6 +168,7 @@ func makeStore(siteNames []string, store Store) (engine.Interface, error) {
 		}
 		return result, nil
 	}
+
 	return nil, errors.Errorf("unsupported store type %s", store.Type)
 }
 

@@ -55,7 +55,7 @@ func prep(t *testing.T) (srv *Rest, ts *httptest.Server) {
 	require.Nil(t, err)
 	dataStore := service.DataStore{Interface: b, EditDuration: 5 * time.Minute, MaxCommentSize: 4000, Secret: "123456"}
 	srv = &Rest{
-		DataService: dataStore,
+		DataService: &dataStore,
 		Authenticator: auth.Authenticator{
 			DevPasswd:  "password",
 			Providers:  nil,
