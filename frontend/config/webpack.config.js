@@ -9,7 +9,9 @@ const publicFolder = path('public');
 
 module.exports = {
   entry: {
-    remark: './src/app',
+    remark: './src/app/app',
+    counters: './src/widgets/counters/app',
+    'last-comments': './src/widgets/last-comments/app',
   },
   output: {
     path: publicFolder,
