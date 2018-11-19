@@ -8,8 +8,9 @@ debug
 debug.test
 .vscode
 .idea/
-/web/node_modules/
+node_modules/
 /web/public/
+/frontend/public/
 /web/coverage
 *.prof
 *.test
