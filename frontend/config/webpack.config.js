@@ -10,7 +10,7 @@ const publicFolder = path('public');
 
 module.exports = {
   entry: {
-    remark: './src/app/app',
+    remark: './src/app/app.jsx',
     counters: './src/widgets/counters/app',
     'last-comments': './src/widgets/last-comments/app',
     demo: './src/demo/demo',
@@ -25,13 +25,27 @@ module.exports = {
       path('src'),
       path('node_modules'),
     ],
+    alias: {
+      react: path('./node_modules/preact-compat'),
+      'react-dom': path('./node_modules/preact-compat'),
+    },
   },
   module: {
+    rules: [
+      {
+        test: /\.jsx?$/,
+        exclude: /node_modules/,
+        use: ['babel-loader'],
+      },
+    ],
   },
   plugins: [
     new Clean(publicFolder),
     new Define({
       'process.env.NODE_ENV': JSON.stringify(env),
+    }),
+    new webpack.ProvidePlugin({
+      Component: ['preact', 'Component'],
     }),
     new Html({
       template: path('src/demo/index.ejs'),
