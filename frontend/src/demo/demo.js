@@ -1,3 +1,5 @@
-const remark = require('../app/app');
+import remark from '../app/app';
 
-document.getElementById('remark42').innerHTML = remark;
+remark({
+  root: document.getElementById('remark42'),
+});
